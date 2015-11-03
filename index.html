@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>invaders</title>
+        <style type="text/css">
+            body {
+                background: #444;
+                width: 100%;
+                height: 100%;
+            }
+            div#space {
+                background: #222;
+                position: absolute;
+                left: 32px;
+                top: 32px;
+                width: 640px;
+                height: 640px;
+                border: 1px solid rgba(255, 255, 255, 0.5);
+                border-radius: 4px;
+                box-shadow: 0px 0px 16px rgba(0, 0, 0, 1);
+            }
+            img#ship {
+                position: absolute;
+            }
+            img#rocket {
+                display: none;
+            }
+            img.rocket {
+                position: absolute;
+            }
+        </style>
+        <script type="text/javascript">
+            window.invaders = {
+                main: function () {
+                    this.init()
+                },
+
+                keyboard: {
+                    KEY_SPACE: 32,
+                    KEY_LEFT:  37,
+                    KEY_UP:    38,
+                    KEY_RIGHT: 39,
+                    KEY_DOWN:  40
+                },
+
+                Engine: function (parent, vx, vy, keyCode) {
+                    this.TIMEOUT = 25
+                    this.started = false
+                    this.parent = parent
+                    this.dx = vx
+                    this.dy = vy
+                    this.keyCode = keyCode
+                    var self = this
+
+                    this.run = function () {
+                        if (this.started) {
+                            this.parent.shift(this.dx, this.dy)
+                            setTimeout(function () {
+                                self.run()
+                            }, this.TIMEOUT)
+                        }
+                    }
+                    this.start = function () {
+                        if (!this.started) {
+                            this.started = true
+                            this.run()
+                        }
+                    }
+                    this.stop = function () {
+                        this.started = false
+                    }
+
+                    if (this.keyCode > 0) {
+                        document.addEventListener('keydown', function (evt) {
+                            if (evt.keyCode == self.keyCode) {
+                                self.start()
+                            }
+                        })
+                        document.addEventListener('keyup', function (evt) {
+                            if (evt.keyCode == self.keyCode) {
+                                self.stop()
+                            }
+                        })
+                    }
+                },
+
+                Rocket: function (parent, x, y) {
+                    this.parent = parent
+                    this.x = 0
+                    this.y = 0
+                    this.engines = {}
+                    this.width = 7
+                    this.height = 16
+                    this.image = document.createElement('img')
+                    this.image.src = document.getElementById('rocket').src
+                    this.image.className = 'rocket'
+                    this.parent.div.appendChild(this.image)
+
+                    var self = this
+
+                    this.move = function (x, y) {
+                        this.x = Math.floor(x)
+                        this.y = Math.floor(y)
+                        if (this.x + this.width > this.parent.width || this.x < 0 || this.y + this.height > this.parent.height || this.y < 0) {
+                            for (var eng in this.engines) {
+                                if (this.engines.hasOwnProperty(eng)) {
+                                    this.engines[eng].stop()
+                                }
+                            }
+                            this.parent.deleteRocket(self)
+                        } else {
+                            this.image.style.left = this.x + 'px'
+                            this.image.style.top = this.y + 'px'
+                        }
+                    }
+
+                    this.shift = function (dx, dy) {
+                        this.move(this.x + dx, this.y + dy)
+                    }
+
+                    this.move(x, y)
+                },
+
+                Weapon: function (parent, keyCode) {
+                    var LOAD_TIMEOUT = 50
+                    var ROCKET_SPEED = -10
+                    this.parent = parent
+                    this.keyCode = keyCode
+                    this.loaded = false
+
+                    var self = this
+
+                    this.shoot = function () {
+                        if (this.loaded) {
+                            this.loaded = false
+                            var rocket = new window.invaders.Rocket(
+                                window.invaders.space,
+                                this.parent.x + this.parent.width / 2,
+                                this.parent.y
+                            )
+                            var vx = 0
+                            var vy = ROCKET_SPEED
+                            rocket.engines = {
+                                mainEngine: new window.invaders.Engine(rocket, vx, vy, 0)
+                            }
+                            setTimeout(function () {
+                                rocket.engines.mainEngine.start()
+                            }, 50)
+                        }
+                    }
+
+                    this.load = function () {
+                        setTimeout(function () {
+                            self.loaded = true
+                        }, LOAD_TIMEOUT)
+                    }
+
+                    document.addEventListener('keydown', function (evt) {
+                        if (evt.keyCode == self.keyCode) {
+                            self.shoot()
+                        }
+                    })
+                    document.addEventListener('keyup', function (evt) {
+                        if (evt.keyCode == self.keyCode) {
+                            self.load()
+                        }
+                    })
+
+                    this.load()
+                },
+
+                Ship: function (parent) {
+                    this.parent = parent
+                    this.image = document.getElementById('ship')
+                    this.width = 32
+                    this.height = 32
+                    this.x = 0
+                    this.y = 0
+
+                    this.engines = {
+                        rightEngine: new window.invaders.Engine(this, -5, 0, window.invaders.keyboard.KEY_LEFT),
+                        leftEngine: new window.invaders.Engine(this, 5, 0, window.invaders.keyboard.KEY_RIGHT),
+                        rearEngine: new window.invaders.Engine(this, 0, -5, window.invaders.keyboard.KEY_UP),
+                        inverseEngine: new window.invaders.Engine(this, 0, 5, window.invaders.keyboard.KEY_DOWN)
+                    }
+
+                    this.weapon = new window.invaders.Weapon(this, window.invaders.keyboard.KEY_SPACE)
+
+                    this.move = function (x, y) {
+                        this.x = Math.floor(x)
+                        this.y = Math.floor(y)
+                        if (this.x + this.width > parent.width) {
+                            this.x = parent.width - this.width
+                        }
+                        if (this.y + this.height > parent.height) {
+                            this.y = parent.height - this.height
+                        }
+                        if (this.x < 0) {
+                            this.x = 0
+                        }
+                        if (this.y < 0) {
+                            this.y = 0
+                        }
+                        this.image.style.left = this.x + 'px'
+                        this.image.style.top = this.y + 'px'
+                    }
+
+                    this.shift = function (dx, dy) {
+                        this.move(this.x + dx, this.y + dy)
+                    }
+
+                    this.move(this.parent.width / 2 - this.width / 2, this.parent.height - this.height - 8)
+                },
+
+                space: {
+                    width: 0,
+                    height: 0,
+                    div: null,
+                    ship: null,
+
+                    init: function () {
+                        this.div = document.getElementById('space')
+                        this.setWidth(900)
+                        this.setHeight(500)
+                        this.ship = new window.invaders.Ship(this)
+                    },
+
+                    setWidth: function (w) {
+                        this.width = w
+                        this.div.style.width = this.width + 'px'
+                    },
+
+                    setHeight: function (h) {
+                        this.height = h
+                        this.div.style.height = this.height + 'px'
+                    },
+
+                    deleteRocket: function (rocket) {
+                        this.div.removeChild(rocket.image)
+                        rocket.engines = {}
+                        rocket = null
+                    }
+                },
+
+                init: function () {
+                    this.space.init()
+                }
+            }
+
+            document.addEventListener('readystatechange', function () {
+                if (document.readyState === 'complete') {
+                    window.invaders.main()
+                }
+            })
+        </script>
+    </head>
+    <body>
+        <div id="space">
+            <img id="ship" src="./i/ship.png" width="32" height="32" alt="" />
+            <img id="rocket" src="./i/rocket.png" width="7" height="16" alt="" />
+        </div>
+    </body>
+</html>
